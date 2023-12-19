@@ -1,0 +1,19 @@
+量化运行步骤
+0. 安装tensorRT (已安装可忽略)
+下载地址：https://developer.nvidia.com/nvidia-tensorrt-8x-download
+解压：tar xzvf xxx.tar.gz
+安装：
+cd TensorRT-8.6.1.6/
+cd python;pip install tensorrt-8.6.1-cp3x-none-linux_x86_64.whl (选择对应的python版本)
+cd graphsurgeon;pip install graphsurgeon-0.4.6-py2.py3-none-any.whl
+加载.so:
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${workspace}/TensorRT-8.6.1.6/lib
+
+1. 生成tensorRT模型
+1.1 生成onnx模型：在项目目录下执行./run_convert_onnx.sh ，需要把PYTHONPATH和模型pth文件目录改成自己对应的目录，生成的onnx文件在${workspace}/PMR-CNN/output/pmmv2/R_101/onnx/目录下
+1.2 常量折叠：./sanitize.sh
+1.3 生成tensorRT模型：项目目录下下执行./run_convert_trt.sh, 同样需要修改PYTHONPATH和输入的onnx文件路径，生成的tensorrt文件在${workspace}/PMR-CNN/output/pmmv2/R_101/trt/
+
+2. 运行推理
+2.1 量化前模型推理：./run_test.sh, 模型以及环境准备参照README.md
+2.2 量化后模型推理：./run_trt.sh

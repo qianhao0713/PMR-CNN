@@ -54,7 +54,7 @@ class PMMsRCNNv2(nn.Module):
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         self.vis_period = cfg.VIS_PERIOD
         self.input_format = cfg.INPUT.FORMAT
-        self.num_pro = 2  
+        self.num_pro = 3  
         self.PMMs = PMMs(1024, self.num_pro)
 
         # visualize
@@ -86,12 +86,12 @@ class PMMsRCNNv2(nn.Module):
             nn.ReLU()
         )
 
-        self.layer7 = nn.Sequential(
-            nn.Conv2d(in_channels=1025, out_channels=1024, kernel_size=3, stride=1, padding=1, dilation=1,
-                      bias=True),
-            nn.BatchNorm2d(1024),
-            nn.ReLU()
-        )
+        # self.layer7 = nn.Sequential(
+        #     nn.Conv2d(in_channels=1025, out_channels=1024, kernel_size=3, stride=1, padding=1, dilation=1,
+        #               bias=True),
+        #     nn.BatchNorm2d(1024),
+        #     nn.ReLU()
+        # )
 
         self.logger = logging.getLogger(__name__)
 
@@ -234,9 +234,9 @@ class PMMsRCNNv2(nn.Module):
 
             # concat
             pos_concat = torch.cat([exit_feat, pos_Prob_map], dim=1)
-            pos_conv = self.layer7(pos_concat)
+            # pos_conv = self.layer7(pos_concat)
 
-            pos_features = {'res4': pos_conv}
+            pos_features = {'res4': exit_feat}
             pos_support_box_features = support_box_features[pos_begin:pos_end].mean(0, True)
 
             # rpn
@@ -357,12 +357,12 @@ class PMMsRCNNv2(nn.Module):
 
         support_file_name = os.path.join(support_dir, 'support_feature.pkl')
         if not os.path.exists(support_file_name):
-            support_path = './datasets/coco/novel_10_shot_support_df.pkl'
+            support_path = './datasets/coco/novel_20_shot_mixed_support_df_2.pkl'
             support_df = pd.read_pickle(support_path)
 
-            metadata = MetadataCatalog.get('coco_2017_train')
+            metadata = MetadataCatalog.get('318_val')
             # unmap the category mapping ids for COCO
-            reverse_id_mapper = lambda dataset_id: metadata.thing_dataset_id_to_contiguous_id[dataset_id]  # noqa
+            reverse_id_mapper = lambda dataset_id: metadata.thing_dataset_id_to_contiguous_id[dataset_id] # noqa
             support_df['category_id'] = support_df['category_id'].map(reverse_id_mapper)
 
             support_dict = {'res4_avg': {}, 'res5_avg': {}}
@@ -473,9 +473,9 @@ class PMMsRCNNv2(nn.Module):
 
             # concat
             pos_concat = torch.cat([exit_feat, Prob_map], dim=1)
-            pos_conv = self.layer7(pos_concat)
+            # pos_conv = self.layer7(pos_concat)
 
-            pos_features = {'res4': pos_conv}
+            pos_features = {'res4': exit_feat}
             support_correlation = pos_features  # attention map for attention rpn
 
             proposals, _ = self.proposal_generator(query_images, support_correlation, None)

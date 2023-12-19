@@ -1,9 +1,7 @@
 name: fsod
 channels:
-  - pytorch
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
   - http://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
-  - conda-forge
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/msys2/
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/
@@ -19,7 +17,7 @@ dependencies:
   - c-ares=1.18.1=h7f98852_0
   - ca-certificates=2022.4.26=h06a4308_0
   - cairo=1.16.0=ha00ac49_1009
-  - cudatoolkit=10.1.243=h036e899_10
+  - cudatoolkit=11.3.1=h2bc3f7f_2
   - dbus=1.13.6=h5008d03_3
   - expat=2.4.6=h27087fc_0
   - ffmpeg=4.3.2=h37c90e5_3
@@ -116,7 +114,7 @@ dependencies:
   - python=3.8.12=ha38a3c6_3_cpython
   - python-dateutil=2.8.2=pyhd3eb1b0_0
   - python_abi=3.8=2_cp38
-  - pytorch=1.5.0=py3.8_cuda10.1.243_cudnn7.6.3_0
+  - pytorch=1.10.0=py3.8_cuda11.3_cudnn8.2.0_0
   - pytz=2021.3=pyhd3eb1b0_0
   - qt=5.12.9=ha98a1a1_5
   - readline=8.1=h46c0cb4_0
@@ -124,7 +122,7 @@ dependencies:
   - six=1.16.0=pyh6c4a22f_0
   - sqlite=3.37.0=h9cd32fc_0
   - tk=8.6.12=h27826a3_0
-  - torchvision=0.6.0=py38_cu101
+  - torchvision=0.11.0=py38_cu113
   - wheel=0.37.1=pyhd8ed1ab_0
   - x264=1!161.3030=h7f98852_1
   - xorg-fixesproto=5.0=h7f98852_1002
@@ -152,7 +150,7 @@ dependencies:
     - charset-normalizer==2.0.12
     - cloudpickle==2.0.0
     - cycler==0.11.0
-    - detectron2==0.3+cu101
+    - detectron2==0.6+cu113
     - fonttools==4.29.1
     - fvcore==0.1.5.post20220212
     - google-auth==2.6.0

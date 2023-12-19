@@ -62,7 +62,7 @@ def filter_coco(coco, cls_split):
 
 root_path = ''
 print(root_path)
-dataDir = '/Users/zhoujiancong/datasets/coco2017/annotations'
+dataDir = '/home/qianhao/PMR-CNN/datasets/coco/annotations'
 support_dict = {}
 
 support_dict['support_box'] = []

@@ -1,4 +1,5 @@
 from detectron2.layers import batched_nms
+from mmcv.ops import batched_nms as mmcv_batched_nms
 
 
 def ml_nms(boxlist, nms_thresh, max_proposals=-1,
@@ -6,20 +7,21 @@ def ml_nms(boxlist, nms_thresh, max_proposals=-1,
     """
     Performs non-maximum suppression on a boxlist, with scores specified
     in a boxlist field via score_field.
-    
+
     Args:
-        boxlist (detectron2.structures.Boxes): 
-        nms_thresh (float): 
+        boxlist (detectron2.structures.Boxes):
+        nms_thresh (float):
         max_proposals (int): if > 0, then only the top max_proposals are kept
             after non-maximum suppression
-        score_field (str): 
+        score_field (str):
     """
     if nms_thresh <= 0:
         return boxlist
     boxes = boxlist.pred_boxes.tensor
     scores = boxlist.scores
     labels = boxlist.pred_classes
-    keep = batched_nms(boxes, scores, labels, nms_thresh)
+    # keep = batched_nms(boxes, scores, labels, nms_thresh)
+    _, keep = mmcv_batched_nms(boxes, scores, labels, nms_cfg={"iou_threshold": nms_thresh})
     if max_proposals > 0:
         keep = keep[: max_proposals]
     boxlist = boxlist[keep]

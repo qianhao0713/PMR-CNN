@@ -12,6 +12,16 @@ _PREDEFINED_SPLITS_COCO["coco"] = {
     "coco_2017_train_voc_10_shot": ("/public/home/meijilin/dataset/coco2017/train2017",
                                     "coco/new_annotations/novel_10_shot_instances_train2017.json"),
 }
+_PREDEFINED_SPLITS_COCO["318"]={
+    "318_base_train": ("/public/home/meijilin/dataset/318/318mixed/images/full",
+                        "318_2class/new_annotations/instances_mixed_cattle_motorcyclist.json"),
+    "318_novel_10_shot_train": ("/public/home/meijilin/dataset/318/318mixed/images/full",
+                                "318_2class/new_annotations/instances_novel_20_shot.json"),
+    "318_val": ("/home/qianhao/ZSD_tcb/data/318/cattle_all_other_view",
+                "/home/qianhao/PMR-CNN/datasets/coco/new_annotations/only_cattle_all_view1.json")
+    # "318_val": ("/home/qianhao/ZSD_tcb/data/318/cattle_all_other_view",
+    #         "/home/qianhao/PMR-CNN/datasets/coco/new_annotations/only_cattle_all_view.json")
+}
 
 
 def register_all_coco(root):

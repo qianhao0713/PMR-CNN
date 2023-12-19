@@ -10,6 +10,7 @@ from detectron2.layers import Linear, ShapeSpec, batched_nms, cat, nonzero_tuple
 from detectron2.modeling.box_regression import Box2BoxTransform
 from detectron2.structures import Boxes, Instances
 from detectron2.utils.events import get_event_storage
+from mmcv.ops import batched_nms as mmcv_batched_nms
 
 __all__ = ["fsod_fast_rcnn_inference", "FsodFastRCNNOutputLayers"]
 
@@ -99,7 +100,6 @@ def fsod_fast_rcnn_inference_single_image(
         pred_cls = pred_cls[valid_mask]
 
     scores = scores[:, :-1]
-    
     cls_num = pred_cls.unique().shape[0]
     box_num = int(scores.shape[0] / cls_num)
 
@@ -139,6 +139,105 @@ def fsod_fast_rcnn_inference_single_image(
     result.pred_classes = pred_cls
 
     return result, filter_inds[:, 0]
+
+def fsod_fast_rcnn_inference_4onnx(pred_cls, boxes, scores, image_shapes, score_thresh, nms_thresh, topk_per_image):
+    """
+    Call `fsod_fast_rcnn_inference_single_image` for all images.
+
+    Args:
+        boxes (list[Tensor]): A list of Tensors of predicted class-specific or class-agnostic
+            boxes for each image. Element i has shape (Ri, K * 4) if doing
+            class-specific regression, or (Ri, 4) if doing class-agnostic
+            regression, where Ri is the number of predicted objects for image i.
+            This is compatible with the output of :meth:`FsodFastRCNNOutputLayers.predict_boxes`.
+        scores (list[Tensor]): A list of Tensors of predicted class scores for each image.
+            Element i has shape (Ri, K + 1), where Ri is the number of predicted objects
+            for image i. Compatible with the output of :meth:`FsodFastRCNNOutputLayers.predict_probs`.
+        image_shapes (list[tuple]): A list of (width, height) tuples for each image in the batch.
+        score_thresh (float): Only return detections with a confidence score exceeding this
+            threshold.
+        nms_thresh (float):  The threshold to use for box non-maximum suppression. Value in [0, 1].
+        topk_per_image (int): The number of top scoring detections to return. Set < 0 to return
+            all detections.
+
+    Returns:
+        instances: (list[Instances]): A list of N instances, one for each image in the batch,
+            that stores the topk most confidence detections.
+        kept_indices: (list[Tensor]): A list of 1D tensor of length of N, each element indicates
+            the corresponding boxes/scores index in [0, Ri) from the input, for image i.
+    """
+    result_per_image = [
+        fsod_fast_rcnn_inference_single_image_4onnx(
+            pred_cls_per_image, boxes_per_image, scores_per_image, image_shape, score_thresh, nms_thresh, topk_per_image
+        )
+        for pred_cls_per_image, scores_per_image, boxes_per_image, image_shape in zip(pred_cls, scores, boxes, image_shapes)
+    ]
+    return torch.cat([x[0] for x in result_per_image]), torch.cat([x[1] for x in result_per_image]), torch.cat([x[2] for x in result_per_image]), torch.tensor(result_per_image[0][3])
+
+def fsod_fast_rcnn_inference_single_image_4onnx(
+    pred_cls, boxes, scores, image_shape, score_thresh, nms_thresh, topk_per_image
+):
+    """
+    Single-image inference. Return bounding-box detection results by thresholding
+    on scores and applying non-maximum suppression (NMS).
+
+    Args:
+        Same as `fsod_fast_rcnn_inference`, but with boxes, scores, and image shapes
+        per image.
+
+    Returns:
+        Same as `fsod_fast_rcnn_inference`, but for only one image.
+    """
+    valid_mask = torch.isfinite(boxes).all(dim=1) & torch.isfinite(scores).all(dim=1)
+
+    if not valid_mask.all():
+        boxes = boxes[valid_mask]
+        scores = scores[valid_mask]
+        pred_cls = pred_cls[valid_mask]
+
+    scores = scores[:, :-1]
+    cls_num = 2
+    box_num = int(scores.shape[0] / cls_num)
+
+    scores = scores.reshape(cls_num, box_num).permute(1, 0)
+    boxes = boxes.reshape(cls_num, box_num, 4).permute(1, 0, 2).reshape(box_num, -1)
+    pred_cls = pred_cls.reshape(cls_num, box_num).permute(1, 0)
+
+    num_bbox_reg_classes = boxes.shape[1] // 4
+    # Convert to Boxes to use the `clip` function ...
+    boxes = Boxes(boxes.reshape(-1, 4))
+    boxes.clip(image_shape)
+    boxes = boxes.tensor.view(-1, num_bbox_reg_classes, 4)  # R x C x 4
+
+    # Filter results based on detection scores
+    filter_mask = scores > score_thresh  # R x K
+    # R' x 2. First column contains indices of the R predictions;
+    # Second column contains indices of classes.
+    filter_inds = filter_mask.nonzero()
+    orig_box = boxes.detach().clone()
+    if num_bbox_reg_classes == 1:
+        boxes = boxes[filter_inds[:, 0], 0]
+    else:
+        boxes = boxes[filter_mask]
+    # ori_scores = filter_inds.detach()
+    scores = scores[filter_mask]
+    pred_cls = pred_cls[filter_mask]
+
+    # Apply per-class NMS
+    # keep = batched_nms(boxes, scores, filter_inds[:, 1], nms_thresh)
+    _, keep = mmcv_batched_nms(boxes=boxes, scores=scores, idxs=filter_inds[:, 1], nms_cfg={"iou_threshold": nms_thresh})
+    if topk_per_image >= 0:
+        keep = keep[:topk_per_image]
+    #boxes, scores, filter_inds = boxes[keep], scores[keep], filter_inds[keep]
+    boxes, scores, filter_inds, pred_cls = boxes[keep], scores[keep], filter_inds[keep], pred_cls[keep]
+
+    # result = Instances(image_shape)
+    # result.pred_boxes = Boxes(boxes)
+    # result.scores = scores
+    # #result.pred_classes = filter_inds[:, 1]
+    # result.pred_classes = pred_cls
+
+    return boxes, scores, pred_cls, image_shape
 
 
 class FsodFastRCNNOutputs(object):
@@ -240,7 +339,7 @@ class FsodFastRCNNOutputs(object):
         fg_inds = (self.gt_classes == 0).nonzero().squeeze(-1)
         bg_inds = (self.gt_classes == 1).nonzero().squeeze(-1)
 
-        
+
         bg_cls_score_softmax = cls_score_softmax[bg_inds, :]
 
         bg_num_0 = max(1, min(fg_inds.shape[0] * 2, int(num_instances * 0.25))) #int(num_instances * 0.5 - fg_inds.shape[0])))
@@ -417,7 +516,7 @@ class FsodFastRCNNOutputLayers(nn.Module):
             self.conv_3 = nn.Conv2d(int(dim_in/4), dim_in, 1, padding=0, bias=False)
             self.bbox_pred_pr = nn.Linear(dim_in, 4) #num_bbox_reg_classes * box_dim)
             self.cls_score_pr = nn.Linear(dim_in, 2) #nn.Linear(dim_in, 2)
- 
+
         if self.local_correlation:
             self.conv_cor = nn.Conv2d(dim_in, dim_in, 1, padding=0, bias=False)
             #self.bbox_pred_cor = nn.Linear(dim_in, 4)
@@ -478,12 +577,18 @@ class FsodFastRCNNOutputLayers(nn.Module):
             # fmt: on
         }
 
+    def squeeze_2_3(self, x):
+        x_shape = x.shape
+        return x.reshape([x_shape[0], x_shape[1]])
+
     def forward(self, x_query, x_support):
         support = x_support #.mean(0, True) # avg pool on res4 or avg pool here?
         # fc
         if self.global_relation:
-            x_query_fc = self.avgpool_fc(x_query).squeeze(3).squeeze(2)
-            support_fc = self.avgpool_fc(support).squeeze(3).squeeze(2).expand_as(x_query_fc)
+            x_query_fc = self.avgpool_fc(x_query)
+            x_query_fc = self.squeeze_2_3(x_query_fc)
+            support_fc = self.avgpool_fc(support)
+            support_fc = self.squeeze_2_3(support_fc).expand_as(x_query_fc)
             cat_fc = torch.cat((x_query_fc, support_fc), 1)
             out_fc = F.relu(self.fc_1(cat_fc), inplace=True)
             out_fc = F.relu(self.fc_2(out_fc), inplace=True)
@@ -493,7 +598,8 @@ class FsodFastRCNNOutputLayers(nn.Module):
         if self.local_correlation:
             x_query_cor = self.conv_cor(x_query)
             support_cor = self.conv_cor(support)
-            x_cor = F.relu(F.conv2d(x_query_cor, support_cor.permute(1,0,2,3), groups=2048), inplace=True).squeeze(3).squeeze(2)
+            x_cor = F.relu(F.conv2d(x_query_cor, support_cor.permute(1,0,2,3), groups=2048), inplace=True)
+            x_cor = self.squeeze_2_3(x_cor)
             cls_score_cor = self.cls_score_cor(x_cor)
 
         # relation
@@ -505,13 +611,13 @@ class FsodFastRCNNOutputLayers(nn.Module):
             x = F.relu(self.conv_2(x), inplace=True) # 3x3
             x = F.relu(self.conv_3(x), inplace=True) # 3x3
             x = self.avgpool(x) # 1x1
-            x = x.squeeze(3).squeeze(2)
+            x = self.squeeze_2_3(x)
             cls_score_pr = self.cls_score_pr(x)
 
         bbox_pred_all = self.bbox_pred_pr(x)
         # final result
         cls_score_all = cls_score_pr + cls_score_cor + cls_score_fc
-        
+
         return cls_score_all, bbox_pred_all
 
     # TODO: move the implementation to this class.
@@ -540,6 +646,29 @@ class FsodFastRCNNOutputLayers(nn.Module):
         pred_cls = pred_cls.split(num_inst_per_image, dim=0)
         image_shapes = [x.image_size for x in proposals]
         return fsod_fast_rcnn_inference(
+            pred_cls,
+            boxes,
+            scores,
+            image_shapes,
+            self.test_score_thresh,
+            self.test_nms_thresh,
+            self.test_topk_per_image,
+        )
+
+    def inference_4onnx(self, pred_cls, predictions, proposals):
+        """
+        Returns:
+            Tensor: box.
+            Tensor: score.
+            Tensor: pred_cls.
+            Tensor: image_shape
+        """
+        boxes = self.predict_boxes(predictions, proposals)
+        scores = self.predict_probs(predictions, proposals)
+        num_inst_per_image = [len(p) for p in proposals]
+        pred_cls = pred_cls.split(num_inst_per_image, dim=0)
+        image_shapes = [x.image_size for x in proposals]
+        return fsod_fast_rcnn_inference_4onnx(
             pred_cls,
             boxes,
             scores,

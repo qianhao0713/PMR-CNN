@@ -231,7 +231,7 @@ class COCOEvaluator(DatasetEvaluator):
             self._logger.info("Annotations are not available for evaluation.")
             return
 
-        self._logger.info("Evaluating bbox proposals ...")
+        #self._logger.info("Evaluating bbox proposals ...")
         res = {}
         areas = {"all": "", "small": "s", "medium": "m", "large": "l"}
         for limit in [100, 1000]:
@@ -310,8 +310,8 @@ class COCOEvaluator(DatasetEvaluator):
         self._logger.info(
             "Evaluation results for {}: \n".format(iou_type) + create_small_table(results)
         )
-        if not np.isfinite(sum(results.values())):
-            self._logger.info("Some metrics cannot be computed and is shown as NaN.")
+        # if not np.isfinite(sum(results.values())):
+        #     self._logger.info("Some metrics cannot be computed and is shown as NaN.")
 
         if class_names is None or len(class_names) <= 1:
             return results
@@ -343,20 +343,20 @@ class COCOEvaluator(DatasetEvaluator):
         voc_ap_large, non_voc_ap_large = self._calculate_ap(class_names, precisions, A=3) # A=3, large
 
         # print voc ap
-        self._logger.info("Evaluation results for VOC 20 categories =======> AP  : " + str('%.2f' % voc_ap))
-        self._logger.info("Evaluation results for VOC 20 categories =======> AP50: " + str('%.2f' % voc_ap_50))
-        self._logger.info("Evaluation results for VOC 20 categories =======> AP75: " + str('%.2f' % voc_ap_75))
-        self._logger.info("Evaluation results for VOC 20 categories =======> APs : " + str('%.2f' % voc_ap_small))
-        self._logger.info("Evaluation results for VOC 20 categories =======> APm : " + str('%.2f' % voc_ap_medium))
-        self._logger.info("Evaluation results for VOC 20 categories =======> APl : " + str('%.2f' % voc_ap_large))
+        # self._logger.info("Evaluation results for VOC 20 categories =======> AP  : " + str('%.2f' % voc_ap))
+        # self._logger.info("Evaluation results for VOC 20 categories =======> AP50: " + str('%.2f' % voc_ap_50))
+        # self._logger.info("Evaluation results for VOC 20 categories =======> AP75: " + str('%.2f' % voc_ap_75))
+        # self._logger.info("Evaluation results for VOC 20 categories =======> APs : " + str('%.2f' % voc_ap_small))
+        # self._logger.info("Evaluation results for VOC 20 categories =======> APm : " + str('%.2f' % voc_ap_medium))
+        # self._logger.info("Evaluation results for VOC 20 categories =======> APl : " + str('%.2f' % voc_ap_large))
 
-        # print voc ap
-        self._logger.info("Evaluation results for Non VOC 60 categories =======> AP  : " + str('%.2f' % non_voc_ap))
-        self._logger.info("Evaluation results for Non VOC 60 categories =======> AP50: " + str('%.2f' % non_voc_ap_50))
-        self._logger.info("Evaluation results for Non VOC 60 categories =======> AP75: " + str('%.2f' % non_voc_ap_75))
-        self._logger.info("Evaluation results for Non VOC 60 categories =======> APs : " + str('%.2f' % non_voc_ap_small))
-        self._logger.info("Evaluation results for Non VOC 60 categories =======> APm : " + str('%.2f' % non_voc_ap_medium))
-        self._logger.info("Evaluation results for Non VOC 60 categories =======> APl : " + str('%.2f' % non_voc_ap_large))
+        # # print voc ap
+        # self._logger.info("Evaluation results for Non VOC 60 categories =======> AP  : " + str('%.2f' % non_voc_ap))
+        # self._logger.info("Evaluation results for Non VOC 60 categories =======> AP50: " + str('%.2f' % non_voc_ap_50))
+        # self._logger.info("Evaluation results for Non VOC 60 categories =======> AP75: " + str('%.2f' % non_voc_ap_75))
+        # self._logger.info("Evaluation results for Non VOC 60 categories =======> APs : " + str('%.2f' % non_voc_ap_small))
+        # self._logger.info("Evaluation results for Non VOC 60 categories =======> APm : " + str('%.2f' % non_voc_ap_medium))
+        # self._logger.info("Evaluation results for Non VOC 60 categories =======> APl : " + str('%.2f' % non_voc_ap_large))
 
         '''
         # log evaluation results in csv

@@ -189,6 +189,58 @@ class FsodRes5ROIHeads(ROIHeads):
         pred_instances = self.forward_with_given_boxes(features, pred_instances)
 
         return pred_instances, {}
+    
+    @torch.no_grad()
+    def eval_with_support_4onnx(self, images, features, support_proposals_dict, support_box_features_dict):
+        """
+        See :meth:`ROIHeads.forward`.
+        """
+        del images
+        
+        full_proposals_ls = []
+        cls_ls = []
+        for cls_id, proposals in support_proposals_dict.items():
+            full_proposals_ls.append(proposals[0])
+            cls_ls.append(cls_id)
+        
+        full_proposals_ls = [Instances.cat(full_proposals_ls)]
+
+        proposal_boxes = [x.proposal_boxes for x in full_proposals_ls]
+        try:
+            assert len(proposal_boxes[0]) == 2000
+        except:
+            pass
+
+        
+
+        box_features = self._shared_roi_transform(
+            [features[f] for f in self.in_features], proposal_boxes
+        )
+        full_scores_ls = []
+        full_bboxes_ls = []
+        full_cls_ls = []
+        cnt = 0
+        #for cls_id, support_box_features in support_box_features_dict.items():
+        for cls_id in cls_ls:
+            support_box_features = support_box_features_dict[cls_id]
+            query_features = box_features[cnt*100:(cnt+1)*100]
+            pred_class_logits, pred_proposal_deltas = self.box_predictor(query_features, support_box_features)
+            full_scores_ls.append(pred_class_logits)
+            full_bboxes_ls.append(pred_proposal_deltas)
+            full_cls_ls.append(torch.full_like(pred_class_logits[:, 0].unsqueeze(-1), cls_id).to(torch.int8))
+            # del query_features
+            # del support_box_features
+
+            cnt += 1
+        
+        class_logits = torch.cat(full_scores_ls, dim=0)
+        proposal_deltas = torch.cat(full_bboxes_ls, dim=0)
+        pred_cls = torch.cat(full_cls_ls, dim=0) #.unsqueeze(-1)
+        
+        predictions = class_logits, proposal_deltas
+        proposals = full_proposals_ls
+        bbox, score, pred_cls, image_shape = self.box_predictor.inference_4onnx(pred_cls, predictions, proposals)
+        return bbox, score, pred_cls, image_shape
 
     def forward_with_given_boxes(self, features, instances):
         """
@@ -206,7 +258,6 @@ class FsodRes5ROIHeads(ROIHeads):
         """
         assert not self.training
         assert instances[0].has("pred_boxes") and instances[0].has("pred_classes")
-
         if self.mask_on:
             features = [features[f] for f in self.in_features]
             x = self._shared_roi_transform(features, [x.pred_boxes for x in instances])

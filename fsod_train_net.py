@@ -3,7 +3,7 @@
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0,1,2,3,4,5,6,7" 
+# os.environ['CUDA_VISIBLE_DEVICES'] = "0,1,2,3,4,5,6,7" 
 
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
@@ -105,11 +105,12 @@ def main(args):
 if __name__ == "__main__":
     args = default_argument_parser().parse_args()
     print("Command Line Args:", args)
-    launch(
-        main,
-        args.num_gpus,
-        num_machines=args.num_machines,
-        machine_rank=args.machine_rank,
-        dist_url=args.dist_url,
-        args=(args,),
-    )
+    main(args)
+    # launch(
+    #     main,
+    #     args.num_gpus,
+    #     num_machines=args.num_machines,
+    #     machine_rank=args.machine_rank,
+    #     dist_url=args.dist_url,
+    #     args=(args,),
+    # )
